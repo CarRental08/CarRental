@@ -32,13 +32,16 @@ export default defineConfig(({ mode }) => ({
     ],
   },
 
-  // 🔥 CRITICAL FIX FOR TANSTACK + VITE BUILD
+  // ✅ FORCE VITE TO NOT BREAK ON TANSTACK SPLIT PACKAGE
   optimizeDeps: {
     include: ["@tanstack/query-core"],
   },
 
-  // 🔥 FIX FOR ROLLUP / VERCEL BUILD ISSUES
+  // ✅ THIS IS THE KEY FIX DYAD IS TALKING ABOUT
   build: {
+    rollupOptions: {
+      external: ["@tanstack/query-core"],
+    },
     commonjsOptions: {
       include: [/node_modules/],
     },
