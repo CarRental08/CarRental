@@ -53,62 +53,6 @@ export function useBookings() {
     };
   }, [queryClient]);
 
-  const addBookingMutation<dyad-write path="src/hooks/useBookings.ts" description="Completing the useBookings hook with the hasConflict helper and all necessary mutations.">
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import type { Booking } from "@/data/vehicles";
-import { vehicles } from "@/data/vehicles";
-import { sendTelegramNotification } from "@/lib/telegram";
-import { supabase } from "@/integrations/supabase/client";
-
-export function useBookings() {
-  const queryClient = useQueryClient();
-
-  // Fetch all bookings from Supabase
-  const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ["bookings"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      return (data || []).map((b: any) => ({
-        id: b.id,
-        vehicleId: b.vehicle_id,
-        customerName: b.customer_name,
-        customerEmail: b.customer_email,
-        customerPhone: b.customer_phone,
-        pickupDate: b.pickup_date,
-        returnDate: b.return_date,
-        totalPrice: b.total_price,
-        status: b.status,
-        notes: b.notes,
-        createdAt: b.created_at,
-      })) as Booking[];
-    },
-  });
-
-  // Real-time subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel("schema-db-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "bookings" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["bookings"] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
   const addBookingMutation = useMutation({
     mutationFn: async (booking: Omit<Booking, "id" | "status" | "createdAt">) => {
       const { data, error } = await supabase
