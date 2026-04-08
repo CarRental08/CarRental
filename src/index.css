@@ -110,12 +110,31 @@
 @layer base {
   * {
     @apply border-border;
+    /* Disable text selection and touch callouts */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
+  
+  /* Allow selection in inputs and textareas so users can still type */
+  input, textarea {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    /* Prevent pull-to-refresh and overscroll effects */
+    overscroll-behavior-y: none;
   }
   html {
     scroll-behavior: smooth;
+    /* Prevent zooming via touch gestures */
+    touch-action: pan-x pan-y;
   }
 }
 
