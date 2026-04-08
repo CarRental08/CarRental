@@ -4,7 +4,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { vehicles } from "@/data/vehicles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Clock, CheckCircle, XCircle, Car, TrendingUp, AlertCircle, CalendarDays, List, Settings2, BarChart3 } from "lucide-react";
+import { LogOut, Clock, CheckCircle, XCircle, Car, TrendingUp, AlertCircle, CalendarDays, List, Settings2, BarChart3, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import BookingCalendar from "@/components/BookingCalendar";
 import VehicleManagement from "@/components/VehicleManagement";
@@ -20,19 +20,34 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
   const { bookings, updateBookingStatus } = useBookings();
   const { logout } = useAdmin();
   const [view, setView] = useState<AdminView>("list");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const pending = bookings.filter((b) => b.status === "pending");
   const approved = bookings.filter((b) => b.status === "approved");
   const totalRevenue = approved.reduce((s, b) => s + b.totalPrice, 0);
 
-  const handleApprove = (id: string) => {
-    updateBookingStatus(id, "approved");
-    toast.success("Booking approved!");
+  const handleApprove = async (id: string) => {
+    setProcessingId(id);
+    try {
+      await updateBookingStatus(id, "approved");
+      toast.success("Booking approved! Notification email sent.");
+    } catch (error) {
+      toast.error("Failed to update status.");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
-  const handleReject = (id: string) => {
-    updateBookingStatus(id, "rejected");
-    toast.info("Booking rejected.");
+  const handleReject = async (id: string) => {
+    setProcessingId(id);
+    try {
+      await updateBookingStatus(id, "rejected");
+      toast.info("Booking rejected. Notification email sent.");
+    } catch (error) {
+      toast.error("Failed to update status.");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleExit = () => {
@@ -113,35 +128,65 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
         ) : (
           /* Bookings table */
           <div className="glass-card rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-border">
+            <div className="p-4 border-b border-border flex items-center justify-between">
               <h2 className="font-bold text-foreground">All Bookings</h2>
+              {pending.length > 0 && (
+                <Badge variant="outline" className="text-warning border-warning/30 bg-warning/5">
+                  {pending.length} Pending Approval
+                </Badge>
+              )}
             </div>
 
             {bookings.length === 0 ? (
               <p className="p-8 text-center text-muted-foreground">No bookings yet.</p>
             ) : (
               <div className="divide-y divide-border">
-                {bookings.map((b) => (
-                  <div key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-muted/30 transition-colors">
+                {[...bookings].reverse().map((b) => (
+                  <div key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-foreground truncate">{b.customerName}</p>
-                      <p className="text-xs text-muted-foreground">{getVehicleName(b.vehicleId)} · {b.pickupDate} → {b.returnDate}</p>
-                      <p className="text-xs text-muted-foreground">{b.customerEmail} · {b.customerPhone}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-foreground">₱{b.totalPrice.toLocaleString()}</span>
-                      {statusBadge(b.status)}
-                    </div>
-                    {b.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleApprove(b.id)} className="bg-success text-success-foreground hover:bg-success/90 border-0 text-xs">
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleReject(b.id)} className="text-xs">
-                          Reject
-                        </Button>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-bold text-sm text-foreground truncate">{b.customerName}</p>
+                        {statusBadge(b.status)}
                       </div>
-                    )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Car className="w-3 h-3" /> {getVehicleName(b.vehicleId)}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <CalendarDays className="w-3 h-3" /> {b.pickupDate} → {b.returnDate}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Mail className="w-3 h-3" /> {b.customerEmail}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Phone className="w-3 h-3" /> {b.customerPhone}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3">
+                      <span className="text-base font-extrabold text-foreground">₱{b.totalPrice.toLocaleString()}</span>
+                      {b.status === "pending" && (
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            disabled={processingId === b.id}
+                            onClick={() => handleApprove(b.id)} 
+                            className="bg-success text-success-foreground hover:bg-success/90 border-0 text-xs h-8 px-4"
+                          >
+                            Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            disabled={processingId === b.id}
+                            onClick={() => handleReject(b.id)} 
+                            className="text-xs h-8 px-4"
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
