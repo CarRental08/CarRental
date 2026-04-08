@@ -32,18 +32,8 @@ export default defineConfig(({ mode }) => ({
     ],
   },
 
-  // ✅ FORCE VITE TO NOT BREAK ON TANSTACK SPLIT PACKAGE
+  // ✅ ONLY KEEP THIS (safe optimization)
   optimizeDeps: {
     include: ["@tanstack/query-core"],
-  },
-
-  // ✅ THIS IS THE KEY FIX DYAD IS TALKING ABOUT
-  build: {
-    rollupOptions: {
-      external: ["@tanstack/query-core"],
-    },
-    commonjsOptions: {
-      include: [/node_modules/],
-    },
   },
 }));
