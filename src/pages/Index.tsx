@@ -57,15 +57,6 @@ const Index = () => {
       <Testimonials />
       <Footer onSystemClick={() => setShowAdminLogin(true)} />
 
-      {/* Floating action button */}
-      <button
-        onClick={() => scrollTo("vehicles")}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full gradient-sunset text-secondary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center md:hidden"
-        aria-label="Browse vehicles"
-      >
-        🚗
-      </button>
-
       <VehicleDetailModal
         vehicle={selectedVehicle}
         open={showDetail}

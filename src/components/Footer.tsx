@@ -1,4 +1,4 @@
-import { Phone, Mail, MapPin, Facebook, Instagram, MessageCircle } from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram, MessageCircle, Lock } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 interface FooterProps {
@@ -55,13 +55,14 @@ export default function Footer({ onSystemClick }: FooterProps) {
           </div>
         </div>
 
-        <div className="border-t border-border pt-6 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">© 2026 PalExpress Car Rental Palawan. All rights reserved.</p>
+        <div className="border-t border-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground text-center sm:text-left">© 2026 PalExpress Car Rental Palawan. All rights reserved.</p>
           <button
             onClick={onSystemClick}
-            className="text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+            className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 hover:text-primary transition-colors py-2 px-3 rounded-md hover:bg-primary/5"
           >
-            SYSTEM
+            <Lock className="w-3 h-3" />
+            SYSTEM ACCESS
           </button>
         </div>
       </div>
