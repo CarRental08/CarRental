@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { Booking } from "@/data/vehicles";
 import { useVehicles } from "@/hooks/useVehicles";
 import { sendTelegramNotification } from "@/lib/telegram";
@@ -34,18 +34,22 @@ export function useBookings() {
         createdAt: b.created_at,
       })) as Booking[];
     },
+    // Ensure data is fresh
+    refetchOnWindowFocus: true,
+    staleTime: 0,
   });
 
   // Real-time subscription
   useEffect(() => {
-    // Use a unique channel name to avoid "cannot add callbacks after subscribe" errors
-    const channelName = `bookings-updates-${Math.random().toString(36).substring(7)}`;
+    // Use a unique channel name to avoid conflicts
+    const channelId = `bookings-realtime-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel(channelName)
+      .channel(channelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings" },
         () => {
+          // Force an immediate refetch of all booking data
           queryClient.invalidateQueries({ queryKey: ["bookings"] });
         }
       )
@@ -55,6 +59,30 @@ export function useBookings() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+
+  // Pre-calculate current availability for all vehicles to ensure reactivity
+  const currentAvailability = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const d = new Date(today);
+    const nextDay = new Date(today);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const availabilityMap: Record<string, number> = {};
+
+    vehicles.forEach((vehicle) => {
+      const bookedCount = bookings.filter(
+        (b) =>
+          b.vehicleId === vehicle.id &&
+          b.status === "approved" && // Only count approved bookings for the "Available Now" display
+          new Date(b.pickupDate) < nextDay &&
+          new Date(b.returnDate) > d
+      ).length;
+
+      availabilityMap[vehicle.id] = Math.max(0, vehicle.fleetCount - bookedCount);
+    });
+
+    return availabilityMap;
+  }, [bookings, vehicles]);
 
   const addBookingMutation = useMutation({
     mutationFn: async (booking: Omit<Booking, "id" | "status" | "createdAt">) => {
@@ -124,6 +152,7 @@ export function useBookings() {
       }
     },
     onSuccess: () => {
+      // Immediately invalidate to trigger UI updates
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
     }
   });
@@ -138,44 +167,26 @@ export function useBookings() {
     }
   });
 
-  const getBookedUnits = (vehicleId: string, pickupDate: string, returnDate: string) => {
-    const pickup = new Date(pickupDate);
-    const returnD = new Date(returnDate);
-    return bookings.filter(
-      (b) =>
-        b.vehicleId === vehicleId &&
-        b.status !== "rejected" &&
-        new Date(b.pickupDate) < returnD &&
-        new Date(b.returnDate) > pickup
-    ).length;
-  };
-
-  const getBookedUnitsOnDate = (vehicleId: string, date: string) => {
-    const d = new Date(date);
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
-    return bookings.filter(
-      (b) =>
-        b.vehicleId === vehicleId &&
-        b.status !== "rejected" &&
-        new Date(b.pickupDate) < nextDay &&
-        new Date(b.returnDate) > d
-    ).length;
-  };
-
-  const getCurrentAvailableUnits = (vehicleId: string) => {
-    const vehicle = vehicles.find((v) => v.id === vehicleId);
-    if (!vehicle) return 0;
-    const today = new Date().toISOString().split("T")[0];
-    const booked = getBookedUnitsOnDate(vehicleId, today);
-    return Math.max(0, vehicle.fleetCount - booked);
-  };
-
   const getAvailableUnits = (vehicleId: string, pickupDate: string, returnDate: string) => {
     const vehicle = vehicles.find((v) => v.id === vehicleId);
     if (!vehicle) return 0;
-    const bookedUnits = getBookedUnits(vehicleId, pickupDate, returnDate);
+    
+    const pickup = new Date(pickupDate);
+    const returnD = new Date(returnDate);
+    
+    const bookedUnits = bookings.filter(
+      (b) =>
+        b.vehicleId === vehicleId &&
+        (b.status === "approved" || b.status === "pending") && // For new bookings, consider pending to prevent overbooking
+        new Date(b.pickupDate) < returnD &&
+        new Date(b.returnDate) > pickup
+    ).length;
+    
     return Math.max(0, vehicle.fleetCount - bookedUnits);
+  };
+
+  const getCurrentAvailableUnits = (vehicleId: string) => {
+    return currentAvailability[vehicleId] ?? 0;
   };
 
   const hasConflict = (vehicleId: string, pickupDate: string, returnDate: string) => {
