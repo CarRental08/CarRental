@@ -37,8 +37,10 @@ export function useBookings() {
 
   // Real-time subscription
   useEffect(() => {
+    // Use a unique channel name to avoid "cannot add callbacks after subscribe" errors
+    const channelId = `bookings-realtime-${crypto.randomUUID()}`;
     const channel = supabase
-      .channel("schema-db-changes")
+      .channel(channelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings" },
