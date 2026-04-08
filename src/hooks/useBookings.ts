@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Booking } from "@/data/vehicles";
 import { vehicles } from "@/data/vehicles";
+import { sendTelegramNotification } from "@/lib/telegram";
 
 const STORAGE_KEY = "palexpress_bookings";
 
@@ -25,7 +26,25 @@ export function useBookings() {
       status: "pending",
       createdAt: new Date().toISOString(),
     };
+    
     setBookings((prev) => [...prev, newBooking]);
+
+    // Construct and send Telegram Notification
+    const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+    const message = `
+🚗 <b>NEW BOOKING ALERT</b>
+
+👤 <b>Customer Name:</b> ${booking.customerName}
+📞 <b>Phone:</b> ${booking.customerPhone}
+🚘 <b>Vehicle:</b> ${vehicle?.name || 'Unknown'}
+📅 <b>Pickup Date:</b> ${booking.pickupDate}
+📍 <b>Location:</b> Puerto Princesa, Palawan
+💰 <b>Total Price:</b> ₱${booking.totalPrice.toLocaleString()}
+    `.trim();
+
+    // Trigger notification asynchronously so it doesn't block the UI
+    sendTelegramNotification(message);
+
     return newBooking;
   };
 
