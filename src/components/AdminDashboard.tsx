@@ -4,7 +4,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { vehicles } from "@/data/vehicles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Clock, CheckCircle, XCircle, Car, TrendingUp, AlertCircle, CalendarDays, List, Settings2, BarChart3, Mail, Phone } from "lucide-react";
+import { LogOut, Clock, CheckCircle, XCircle, Car, TrendingUp, AlertCircle, CalendarDays, List, Settings2, BarChart3, Mail, Phone, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import BookingCalendar from "@/components/BookingCalendar";
 import VehicleManagement from "@/components/VehicleManagement";
@@ -17,7 +17,7 @@ interface AdminDashboardProps {
 type AdminView = "list" | "calendar" | "vehicles" | "analytics";
 
 export default function AdminDashboard({ onExit }: AdminDashboardProps) {
-  const { bookings, updateBookingStatus } = useBookings();
+  const { bookings, isLoading, updateBookingStatus, deleteBooking } = useBookings();
   const { logout } = useAdmin();
   const [view, setView] = useState<AdminView>("list");
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -47,6 +47,13 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
       toast.error("Failed to update status.");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this booking record?")) {
+      deleteBooking(id);
+      toast.success("Booking deleted.");
     }
   };
 
@@ -119,7 +126,12 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
           ))}
         </div>
 
-        {view === "calendar" ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <Loader2 className="w-8 h-8 animate-spin mb-2" />
+            <p>Loading dashboard data...</p>
+          </div>
+        ) : view === "calendar" ? (
           <BookingCalendar bookings={bookings} />
         ) : view === "vehicles" ? (
           <VehicleManagement />
@@ -141,7 +153,7 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
               <p className="p-8 text-center text-muted-foreground">No bookings yet.</p>
             ) : (
               <div className="divide-y divide-border">
-                {[...bookings].reverse().map((b) => (
+                {[...bookings].map((b) => (
                   <div key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -164,7 +176,17 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
                       </div>
                     </div>
                     <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3">
-                      <span className="text-base font-extrabold text-foreground">₱{b.totalPrice.toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-base font-extrabold text-foreground">₱{b.totalPrice.toLocaleString()}</span>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDelete(b.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                       {b.status === "pending" && (
                         <div className="flex gap-2">
                           <Button 
@@ -173,7 +195,7 @@ export default function AdminDashboard({ onExit }: AdminDashboardProps) {
                             onClick={() => handleApprove(b.id)} 
                             className="bg-success text-success-foreground hover:bg-success/90 border-0 text-xs h-8 px-4"
                           >
-                            Approve
+                            {processingId === b.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Approve"}
                           </Button>
                           <Button 
                             size="sm" 

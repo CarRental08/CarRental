@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { Booking } from "@/data/vehicles";
 import { vehicles } from "@/data/vehicles";
 import { sendTelegramNotification } from "@/lib/telegram";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 export function useBookings() {
   const queryClient = useQueryClient();
@@ -17,12 +17,8 @@ export function useBookings() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching bookings:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      // Map database fields to our Booking interface
       return (data || []).map((b: any) => ({
         id: b.id,
         vehicleId: b.vehicle_id,
@@ -37,11 +33,26 @@ export function useBookings() {
         createdAt: b.created_at,
       })) as Booking[];
     },
-    // Refetch every 10 seconds for a "real-time" feel in the dashboard
-    refetchInterval: 10000,
   });
 
-  // Mutation to add a new booking
+  // Real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("schema-db-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bookings" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["bookings"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const addBookingMutation = useMutation({
     mutationFn: async (booking: Omit<Booking, "id" | "status" | "createdAt">) => {
       const { data, error } = await supabase
@@ -64,7 +75,6 @@ export function useBookings() {
 
       if (error) throw error;
 
-      // Send Telegram Notification
       const vehicle = vehicles.find(v => v.id === booking.vehicleId);
       const message = `
 🚗 <b>NEW BOOKING ALERT</b>
@@ -80,12 +90,8 @@ export function useBookings() {
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-    },
   });
 
-  // Mutation to update booking status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: Booking["status"] }) => {
       const { error } = await supabase
@@ -95,7 +101,6 @@ export function useBookings() {
 
       if (error) throw error;
 
-      // Trigger Email Notification via Edge Function
       const booking = bookings.find(b => b.id === id);
       if (booking) {
         const vehicle = vehicles.find(v => v.id === booking.vehicleId);
@@ -112,8 +117,12 @@ export function useBookings() {
         });
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+  });
+
+  const deleteBookingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("bookings").delete().eq("id", id);
+      if (error) throw error;
     },
   });
 
@@ -157,19 +166,13 @@ export function useBookings() {
     return Math.max(0, vehicle.fleetCount - bookedUnits);
   };
 
-  const hasConflict = (vehicleId: string, pickupDate: string, returnDate: string) => {
-    return getAvailableUnits(vehicleId, pickupDate, returnDate) <= 0;
-  };
-
   return { 
     bookings, 
     isLoading,
     addBooking: addBookingMutation.mutate, 
     updateBookingStatus: (id: string, status: Booking["status"]) => updateStatusMutation.mutateAsync({ id, status }), 
-    hasConflict, 
+    deleteBooking: deleteBookingMutation.mutate,
     getAvailableUnits, 
-    getBookedUnits, 
-    getBookedUnitsOnDate, 
     getCurrentAvailableUnits 
   };
 }
