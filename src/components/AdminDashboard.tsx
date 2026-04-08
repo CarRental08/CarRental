@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useBookings } from "@/hooks/useBookings";
 import { useAdmin } from "@/hooks/useAdmin";
-import { vehicles } from "@/data/vehicles";
+import { useVehicles } from "@/hooks/useVehicles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Clock, CheckCircle, XCircle, Car, TrendingUp, AlertCircle, CalendarDays, List, Settings2, BarChart3, Mail, Phone, Trash2, Loader2 } from "lucide-react";
@@ -18,6 +18,7 @@ type AdminView = "list" | "calendar" | "vehicles" | "analytics";
 
 export default function AdminDashboard({ onExit }: AdminDashboardProps) {
   const { bookings, isLoading, updateBookingStatus, deleteBooking } = useBookings();
+  const { vehicles } = useVehicles();
   const { logout } = useAdmin();
   const [view, setView] = useState<AdminView>("list");
   const [processingId, setProcessingId] = useState<string | null>(null);

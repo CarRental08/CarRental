@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
-import { vehicles, type Vehicle, type VehicleType } from "@/data/vehicles";
+import { type Vehicle, type VehicleType } from "@/data/vehicles";
 import VehicleCard from "@/components/VehicleCard";
 import { Input } from "@/components/ui/input";
 import { Search, SlidersHorizontal, Heart } from "lucide-react";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useVehicles } from "@/hooks/useVehicles";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 interface VehicleListProps {
@@ -13,6 +14,7 @@ interface VehicleListProps {
 const types: VehicleType[] = ["SUV", "Sedan", "Van", "Compact"];
 
 export default function VehicleList({ onSelectVehicle }: VehicleListProps) {
+  const { vehicles } = useVehicles();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<VehicleType | "All">("All");
   const [showFilters, setShowFilters] = useState(false);
@@ -29,7 +31,7 @@ export default function VehicleList({ onSelectVehicle }: VehicleListProps) {
       const matchFav = !showFavoritesOnly || isFavorite(v.id);
       return matchSearch && matchType && matchFav;
     });
-  }, [search, typeFilter, showFavoritesOnly, favorites]);
+  }, [search, typeFilter, showFavoritesOnly, favorites, vehicles]);
 
   return (
     <section id="vehicles" className="py-20 px-4">

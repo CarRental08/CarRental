@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { Booking } from "@/data/vehicles";
-import { vehicles } from "@/data/vehicles";
+import { useVehicles } from "@/hooks/useVehicles";
 import { sendTelegramNotification } from "@/lib/telegram";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useBookings() {
   const queryClient = useQueryClient();
+  const { vehicles } = useVehicles();
 
   // Fetch all bookings from Supabase
   const { data: bookings = [], isLoading } = useQuery({
@@ -37,10 +38,8 @@ export function useBookings() {
 
   // Real-time subscription
   useEffect(() => {
-    // Use a unique channel name to avoid "cannot add callbacks after subscribe" errors
-    const channelId = `bookings-realtime-${crypto.randomUUID()}`;
     const channel = supabase
-      .channel(channelId)
+      .channel('public:bookings')
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookings" },
@@ -92,6 +91,9 @@ export function useBookings() {
 
       return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    }
   });
 
   const updateStatusMutation = useMutation({
@@ -119,6 +121,9 @@ export function useBookings() {
         });
       }
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    }
   });
 
   const deleteBookingMutation = useMutation({
@@ -126,6 +131,9 @@ export function useBookings() {
       const { error } = await supabase.from("bookings").delete().eq("id", id);
       if (error) throw error;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    }
   });
 
   const getBookedUnits = (vehicleId: string, pickupDate: string, returnDate: string) => {

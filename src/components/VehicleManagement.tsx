@@ -1,27 +1,13 @@
 import { useState } from "react";
-import { vehicles as defaultVehicles, type Vehicle, type VehicleType, type Transmission, type AvailabilityStatus } from "@/data/vehicles";
+import { type Vehicle, type VehicleType, type Transmission, type AvailabilityStatus } from "@/data/vehicles";
 import { useBookings } from "@/hooks/useBookings";
+import { useVehicles } from "@/hooks/useVehicles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Car, Search } from "lucide-react";
 import { toast } from "sonner";
-
-const VEHICLES_KEY = "palexpress_vehicles";
-
-function getStoredVehicles(): Vehicle[] {
-  try {
-    const stored = localStorage.getItem(VEHICLES_KEY);
-    return stored ? JSON.parse(stored) : defaultVehicles;
-  } catch {
-    return defaultVehicles;
-  }
-}
-
-function saveVehicles(v: Vehicle[]) {
-  localStorage.setItem(VEHICLES_KEY, JSON.stringify(v));
-}
 
 const emptyVehicle: Omit<Vehicle, "id"> = {
   name: "",
@@ -40,7 +26,7 @@ const emptyVehicle: Omit<Vehicle, "id"> = {
 };
 
 export default function VehicleManagement() {
-  const [vehicleList, setVehicleList] = useState<Vehicle[]>(getStoredVehicles);
+  const { vehicles: vehicleList, saveVehicles } = useVehicles();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -83,7 +69,6 @@ export default function VehicleManagement() {
       const updated = vehicleList.map((v) =>
         v.id === editingVehicle.id ? { ...v, ...form, features } : v
       );
-      setVehicleList(updated);
       saveVehicles(updated);
       toast.success("Vehicle updated!");
     } else {
@@ -93,7 +78,6 @@ export default function VehicleManagement() {
         id: crypto.randomUUID(),
       };
       const updated = [...vehicleList, newVehicle];
-      setVehicleList(updated);
       saveVehicles(updated);
       toast.success("Vehicle added!");
     }
@@ -102,7 +86,6 @@ export default function VehicleManagement() {
 
   const handleDelete = (id: string) => {
     const updated = vehicleList.filter((v) => v.id !== id);
-    setVehicleList(updated);
     saveVehicles(updated);
     setDeleteConfirm(null);
     toast.success("Vehicle deleted.");
@@ -110,7 +93,6 @@ export default function VehicleManagement() {
 
   const vehicleTypes: VehicleType[] = ["SUV", "Sedan", "Van", "Compact"];
   const transmissions: Transmission[] = ["Automatic", "Manual"];
-  const statuses: AvailabilityStatus[] = ["Available", "Booked", "Maintenance"];
 
   return (
     <div className="glass-card rounded-xl overflow-hidden">
@@ -169,7 +151,6 @@ export default function VehicleManagement() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Dynamic fleet status */}
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-muted text-xs">
                     <span className="text-muted-foreground">Fleet:</span>
                     <span className="font-bold text-success">{availableNow}</span>
