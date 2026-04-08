@@ -1,38 +1,72 @@
-import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Booking } from "@/data/vehicles";
 import { vehicles } from "@/data/vehicles";
 import { sendTelegramNotification } from "@/lib/telegram";
 import { supabase } from "@/integrations/supabase/client";
-
-const STORAGE_KEY = "palexpress_bookings";
+import { toast } from "sonner";
 
 export function useBookings() {
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
+  const queryClient = useQueryClient();
+
+  // Fetch all bookings from Supabase
+  const { data: bookings = [], isLoading } = useQuery({
+    queryKey: ["bookings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching bookings:", error);
+        throw error;
+      }
+
+      // Map database fields to our Booking interface
+      return (data || []).map((b: any) => ({
+        id: b.id,
+        vehicleId: b.vehicle_id,
+        customerName: b.customer_name,
+        customerEmail: b.customer_email,
+        customerPhone: b.customer_phone,
+        pickupDate: b.pickup_date,
+        returnDate: b.return_date,
+        totalPrice: b.total_price,
+        status: b.status,
+        notes: b.notes,
+        createdAt: b.created_at,
+      })) as Booking[];
+    },
+    // Refetch every 10 seconds for a "real-time" feel in the dashboard
+    refetchInterval: 10000,
   });
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-  }, [bookings]);
+  // Mutation to add a new booking
+  const addBookingMutation = useMutation({
+    mutationFn: async (booking: Omit<Booking, "id" | "status" | "createdAt">) => {
+      const { data, error } = await supabase
+        .from("bookings")
+        .insert([
+          {
+            vehicle_id: booking.vehicleId,
+            customer_name: booking.customerName,
+            customer_email: booking.customerEmail,
+            customer_phone: booking.customerPhone,
+            pickup_date: booking.pickupDate,
+            return_date: booking.returnDate,
+            total_price: booking.totalPrice,
+            notes: booking.notes,
+            status: "pending",
+          },
+        ])
+        .select()
+        .single();
 
-  const addBooking = (booking: Omit<Booking, "id" | "status" | "createdAt">) => {
-    const newBooking: Booking = {
-      ...booking,
-      id: crypto.randomUUID(),
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-    
-    setBookings((prev) => [...prev, newBooking]);
+      if (error) throw error;
 
-    // Construct and send Telegram Notification
-    const vehicle = vehicles.find(v => v.id === booking.vehicleId);
-    const message = `
+      // Send Telegram Notification
+      const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+      const message = `
 🚗 <b>NEW BOOKING ALERT</b>
 
 👤 <b>Customer Name:</b> ${booking.customerName}
@@ -41,39 +75,47 @@ export function useBookings() {
 📅 <b>Pickup Date:</b> ${booking.pickupDate}
 📍 <b>Location:</b> Puerto Princesa, Palawan
 💰 <b>Total Price:</b> ₱${booking.totalPrice.toLocaleString()}
-    `.trim();
+      `.trim();
+      sendTelegramNotification(message);
 
-    sendTelegramNotification(message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+  });
 
-    return newBooking;
-  };
+  // Mutation to update booking status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: Booking["status"] }) => {
+      const { error } = await supabase
+        .from("bookings")
+        .update({ status })
+        .eq("id", id);
 
-  const updateBookingStatus = async (id: string, status: Booking["status"]) => {
-    const booking = bookings.find(b => b.id === id);
-    if (!booking) return;
+      if (error) throw error;
 
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status } : b))
-    );
-
-    // Trigger Email Notification via Supabase Edge Function
-    try {
-      const vehicle = vehicles.find(v => v.id === booking.vehicleId);
-      await supabase.functions.invoke("send-booking-email", {
-        body: {
-          customerEmail: booking.customerEmail,
-          customerName: booking.customerName,
-          status: status,
-          vehicleName: vehicle?.name || "Vehicle",
-          pickupDate: booking.pickupDate,
-          returnDate: booking.returnDate,
-          totalPrice: booking.totalPrice
-        }
-      });
-    } catch (error) {
-      console.error("Failed to trigger email notification:", error);
-    }
-  };
+      // Trigger Email Notification via Edge Function
+      const booking = bookings.find(b => b.id === id);
+      if (booking) {
+        const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+        await supabase.functions.invoke("send-booking-email", {
+          body: {
+            customerEmail: booking.customerEmail,
+            customerName: booking.customerName,
+            status: status,
+            vehicleName: vehicle?.name || "Vehicle",
+            pickupDate: booking.pickupDate,
+            returnDate: booking.returnDate,
+            totalPrice: booking.totalPrice
+          }
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+    },
+  });
 
   const getBookedUnits = (vehicleId: string, pickupDate: string, returnDate: string) => {
     const pickup = new Date(pickupDate);
@@ -119,5 +161,15 @@ export function useBookings() {
     return getAvailableUnits(vehicleId, pickupDate, returnDate) <= 0;
   };
 
-  return { bookings, addBooking, updateBookingStatus, hasConflict, getAvailableUnits, getBookedUnits, getBookedUnitsOnDate, getCurrentAvailableUnits };
+  return { 
+    bookings, 
+    isLoading,
+    addBooking: addBookingMutation.mutate, 
+    updateBookingStatus: (id: string, status: Booking["status"]) => updateStatusMutation.mutateAsync({ id, status }), 
+    hasConflict, 
+    getAvailableUnits, 
+    getBookedUnits, 
+    getBookedUnitsOnDate, 
+    getCurrentAvailableUnits 
+  };
 }
