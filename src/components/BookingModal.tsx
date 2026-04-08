@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useBookings } from "@/hooks/useBookings";
-import { CalendarDays, CheckCircle2, Car } from "lucide-react";
+import { CalendarDays, CheckCircle2, Car, Mail, Phone } from "lucide-react";
 
 interface BookingModalProps {
   vehicle: Vehicle | null;
@@ -70,7 +70,7 @@ export default function BookingModal({ vehicle, open, onClose }: BookingModalPro
     });
 
     setSubmitted(true);
-    toast.success("Booking request submitted! Waiting for admin approval.");
+    toast.success("Booking request submitted!");
   };
 
   const handleClose = () => {
@@ -87,14 +87,29 @@ export default function BookingModal({ vehicle, open, onClose }: BookingModalPro
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         {submitted ? (
-          <div className="text-center py-8 animate-scale-in">
-            <CheckCircle2 className="w-16 h-16 text-success mx-auto mb-4" />
+          <div className="text-center py-6 animate-scale-in">
+            <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-10 h-10 text-success" />
+            </div>
             <h3 className="text-xl font-bold text-foreground mb-2">Request Submitted!</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              Your booking for <strong>{vehicle.name}</strong> is pending admin approval. We'll get back to you soon.
-            </p>
-            <Button onClick={handleClose} className="gradient-ocean text-primary-foreground border-0">
-              Done
+            
+            <div className="bg-muted/50 rounded-xl p-4 mb-6 text-left space-y-3 border border-border">
+              <div className="flex gap-3">
+                <Mail className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  Please check your <strong>Gmail inbox or Spam folder</strong>. You will receive an email once your booking for the <strong>{vehicle.name}</strong> is approved.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Phone className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  Alternatively, please wait for our admin to <strong>call or text you</strong> regarding your reservation status.
+                </p>
+              </div>
+            </div>
+
+            <Button onClick={handleClose} className="w-full gradient-ocean text-primary-foreground border-0">
+              Got it, thank you!
             </Button>
           </div>
         ) : (
@@ -161,11 +176,11 @@ export default function BookingModal({ vehicle, open, onClose }: BookingModalPro
                 <Input id="name" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} required maxLength={100} />
               </div>
               <div>
-                <Label htmlFor="email" className="text-xs">Email</Label>
+                <Label htmlFor="email" className="text-xs">Email (for approval notification)</Label>
                 <Input id="email" type="email" value={form.customerEmail} onChange={(e) => setForm({ ...form, customerEmail: e.target.value })} required maxLength={255} />
               </div>
               <div>
-                <Label htmlFor="phone" className="text-xs">Phone</Label>
+                <Label htmlFor="phone" className="text-xs">Phone Number</Label>
                 <Input id="phone" type="tel" value={form.customerPhone} onChange={(e) => setForm({ ...form, customerPhone: e.target.value })} required maxLength={20} />
               </div>
               <div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import type { Booking } from "@/data/vehicles";
 import { vehicles } from "@/data/vehicles";
 import { sendTelegramNotification } from "@/lib/telegram";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "palexpress_bookings";
 
@@ -42,16 +43,36 @@ export function useBookings() {
 💰 <b>Total Price:</b> ₱${booking.totalPrice.toLocaleString()}
     `.trim();
 
-    // Trigger notification asynchronously so it doesn't block the UI
     sendTelegramNotification(message);
 
     return newBooking;
   };
 
-  const updateBookingStatus = (id: string, status: Booking["status"]) => {
+  const updateBookingStatus = async (id: string, status: Booking["status"]) => {
+    const booking = bookings.find(b => b.id === id);
+    if (!booking) return;
+
     setBookings((prev) =>
       prev.map((b) => (b.id === id ? { ...b, status } : b))
     );
+
+    // Trigger Email Notification via Supabase Edge Function
+    try {
+      const vehicle = vehicles.find(v => v.id === booking.vehicleId);
+      await supabase.functions.invoke("send-booking-email", {
+        body: {
+          customerEmail: booking.customerEmail,
+          customerName: booking.customerName,
+          status: status,
+          vehicleName: vehicle?.name || "Vehicle",
+          pickupDate: booking.pickupDate,
+          returnDate: booking.returnDate,
+          totalPrice: booking.totalPrice
+        }
+      });
+    } catch (error) {
+      console.error("Failed to trigger email notification:", error);
+    }
   };
 
   const getBookedUnits = (vehicleId: string, pickupDate: string, returnDate: string) => {
