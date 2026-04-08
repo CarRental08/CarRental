@@ -36,4 +36,16 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["@tanstack/query-core"],
   },
+  
+  // Fix for Vercel build: externalize @tanstack/query-core to prevent bundling issues
+  build: {
+    rollupOptions: {
+      external: ["@tanstack/query-core"],
+      output: {
+        globals: {
+          "@tanstack/query-core": "tanstackQueryCore",
+        },
+      },
+    },
+  },
 }));
